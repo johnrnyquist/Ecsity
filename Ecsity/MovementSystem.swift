@@ -3,7 +3,7 @@ import Foundation
 open class MovementSystem: System {
     let storage: ArchetypeStorage
 
-    init(storage: ArchetypeStorage) {
+    public init(storage: ArchetypeStorage) {
         self.storage = storage
     }
 

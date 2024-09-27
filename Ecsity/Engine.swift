@@ -5,7 +5,7 @@ open class Engine {
     private(set) var systems: [System] = []
     var numEntities: Int { storage.numEntities }
 
-    init() {
+    public init() {
         storage = ArchetypeStorage()
     }
 

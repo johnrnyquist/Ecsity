@@ -11,7 +11,7 @@ public struct Entity: Hashable, CustomStringConvertible {
     let id: String
     public var description: String { id }
 
-    init(id: String) {
+    public init(id: String) {
         Entity.count += 1
         self.id = id
     }

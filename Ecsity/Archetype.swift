@@ -54,7 +54,7 @@ open class Archetype {
     /// where Position is an ObjectIdentifier of the Position component
     var components: [ObjectIdentifier: [Entity: Component]]
 
-    init(componentTypes: Set<ObjectIdentifier>, name: String? = nil) {
+    public init(componentTypes: Set<ObjectIdentifier>, name: String? = nil) {
         self.componentTypes = componentTypes
         entities = []
         components = [:]

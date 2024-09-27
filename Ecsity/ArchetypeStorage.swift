@@ -8,7 +8,7 @@ open class ArchetypeStorage {
     private var memoizedResults: [Set<ObjectIdentifier>: Set<Entity>] = [:]
 
     // Initializer
-    init() {
+    public init() {
     }
 
     // Computed properties
