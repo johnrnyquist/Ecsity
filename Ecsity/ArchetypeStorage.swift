@@ -6,7 +6,6 @@ open class ArchetypeStorage {
     private var entityToArchetype: [Entity: Archetype] = [:]
     private var componentTypesToArchetype: [Set<ObjectIdentifier>: Archetype] = [:]
     private var memoizedResults: [Set<ObjectIdentifier>: Set<Entity>] = [:]
-
     // Initializer
     public init() {
     }
@@ -24,11 +23,10 @@ open class ArchetypeStorage {
     private var entities: Set<Entity> {
         Set(entityToArchetype.keys)
     }
-
     // MARK: - Archetype Management
     func createNewArchetype(for entity: Entity, addingComponentType objectIdentifier: ObjectIdentifier) -> Archetype? {
         clearCache(for: [objectIdentifier])
-        guard let oldArchetype = entityToArchetype[entity] 
+        guard let oldArchetype = entityToArchetype[entity]
         else {
             return nil
         }
@@ -76,7 +74,7 @@ open class ArchetypeStorage {
     // MARK: - Entity Management
     public func findEntities(with componentTypes: [Component.Type]) -> Set<Entity> {
         // Early exit if no component types are provided
-        guard !componentTypes.isEmpty 
+        guard !componentTypes.isEmpty
         else {
             return entities
         }
@@ -87,17 +85,19 @@ open class ArchetypeStorage {
         }
         // Compute the result if not memoized
         let result = Set(archetypes.lazy
-                                   .filter { archetype in 
-                                       archetype.componentTypes.isSuperset(of: queryTypes) }
-                                   .flatMap { archetype in 
-                                       archetype.entities })
+                                   .filter { archetype in
+                                       archetype.componentTypes.isSuperset(of: queryTypes)
+                                   }
+                                   .flatMap { archetype in
+                                       archetype.entities
+                                   })
         // Memoize the result
         memoizedResults[queryTypes] = result
         return result
     }
 
     @discardableResult
-    func add(entity: Entity, withComponents componentTypes: Set<ObjectIdentifier>) -> Archetype {
+    public func add(entity: Entity, withComponents componentTypes: Set<ObjectIdentifier>) -> Archetype {
         clearCache(for: componentTypes)
         if let archetype = componentTypesToArchetype[componentTypes] {
             archetype.add(entity)
@@ -129,8 +129,8 @@ open class ArchetypeStorage {
         }
     }
 
-    func remove(entity: Entity) {
-        guard let archetype = entityToArchetype[entity] 
+    public func remove(entity: Entity) {
+        guard let archetype = entityToArchetype[entity]
         else {
             return
         }
@@ -190,9 +190,9 @@ open class ArchetypeStorage {
         archetype.updateComponent(component, for: entity)
     }
 
-    func remove<T: Component>(componentType: T.Type, from entity: Entity) {
+    public func remove<T: Component>(componentType: T.Type, from entity: Entity) {
         clearCache(for: [ObjectIdentifier(T.self)])
-        guard let archetype = entityToArchetype[entity] 
+        guard let archetype = entityToArchetype[entity]
         else {
             return
         }
@@ -202,6 +202,13 @@ open class ArchetypeStorage {
             archetype.remove(entity)
             entityToArchetype[entity] = nil
         }
+    }
+
+    public func findAllComponents<T: Component>(ofType componentType: T.Type) -> Set<T> {
+        let objectIdentifier = ObjectIdentifier(T.self)
+        return Set(archetypes.flatMap { archetype in
+            archetype.components[objectIdentifier]?.compactMap { $0.value as? T } ?? []
+        })
     }
 }
 

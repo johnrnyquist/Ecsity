@@ -1,12 +1,32 @@
 import Foundation
 
 open class Engine {
-    public let storage: ArchetypeStorage
+    let storage: ArchetypeStorage
     private(set) var systems: [System] = []
     public var numEntities: Int { storage.numEntities }
 
     public init() {
         storage = ArchetypeStorage()
+    }
+
+    public func findAllComponents<T: Component>(ofType componentType: T.Type) -> Set<T> {
+        storage.findAllComponents(ofType: componentType)
+    }
+
+    public func findEntities(with componentTypes: [Component.Type]) -> Set<Entity> {
+        storage.findEntities(with: componentTypes)
+    }
+
+    public func find<T: Component>(componentType: T.Type, in entity: Entity) -> T? {
+        storage.find(componentType: componentType, in: entity)
+    }
+
+    public func add(entity: Entity, withComponents componentTypes: Set<ObjectIdentifier>) -> Archetype {
+        storage.add(entity: entity, withComponents: componentTypes)
+    }
+
+    public func add<T: Component>(component: T, to entity: Entity) {
+        storage.add(component: component, to: entity)
     }
 
     public func add(system: System) {
@@ -22,8 +42,8 @@ open class Engine {
     public func remove(entity: Entity) {
         storage.remove(entity: entity)
     }
-    
-    public func remove(componentType: Component.Type, from entity: Entity) {
+
+    public func remove<T: Component>(componentType: T.Type, from entity: Entity) {
         storage.remove(componentType: componentType, from: entity)
     }
 }

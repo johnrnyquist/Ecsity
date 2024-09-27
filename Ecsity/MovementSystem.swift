@@ -1,17 +1,17 @@
 import Foundation
 
 open class MovementSystem: System {
-    let storage: ArchetypeStorage
+    weak var engine: Engine!
 
-    public init(storage: ArchetypeStorage) {
-        self.storage = storage
+    public init(engine: Engine) {
+        self.engine = engine
     }
 
     public func update(deltaTime: TimeInterval) {
-        let entities = storage.findEntities(with: [Position.self, Velocity.self])
+        let entities = engine.findEntities(with: [Position.self, Velocity.self])
         for entity in entities {
-            guard let position: Position = storage.find(componentType: Position.self, in: entity),
-                  let velocity: Velocity = storage.find(componentType: Velocity.self, in: entity) else {
+            guard let position: Position = engine.find(componentType: Position.self, in: entity),
+                  let velocity: Velocity = engine.find(componentType: Velocity.self, in: entity) else {
                 continue
             }
             // If position were value type, copy it via assignment and change to var
@@ -20,7 +20,7 @@ open class MovementSystem: System {
             newPosition.y += velocity.dy * deltaTime
             // Then update the position in the entity only if it has changed in the storage, not necessary for classes
             if newPosition != position {
-                storage.add(component: newPosition, to: entity)
+                engine.add(component: newPosition, to: entity)
             }
         }
     }
