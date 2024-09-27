@@ -168,7 +168,7 @@ open class ArchetypeStorage {
         return archetype.find(componentType: componentType, in: entity)
     }
 
-    func add<T: Component>(component: T, to entity: Entity) {
+    public func add<T: Component>(component: T, to entity: Entity) {
         clearCache(for: [ObjectIdentifier(T.self)])
         let objectIdentifier = ObjectIdentifier(T.self)
         // Check if the entity already has an associated archetype
