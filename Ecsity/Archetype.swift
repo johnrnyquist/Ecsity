@@ -50,7 +50,7 @@ open class Archetype {
     /// The set of entities that this archetype contains
     private(set) var entities: Set<Entity>
     /// A dictionary of component types to a dictionary of entity to component
-    /// ie [Position: [Entity_1: Position(x: 1.0, y: 1.0)]] 
+    /// ie [Position: [Entity_1: Position(x: 1.0, y: 1.0)]]
     /// where Position is an ObjectIdentifier of the Position component
     var components: [ObjectIdentifier: [Entity: Component]]
 
@@ -64,7 +64,7 @@ open class Archetype {
 
     func add<T: Component>(component: T, to entity: Entity) {
         let componentType = ObjectIdentifier(T.self)
-        /// ie [Position: [Entity_1: Position(x: 1.0, y: 1.0)]] 
+        /// ie [Position: [Entity_1: Position(x: 1.0, y: 1.0)]]
         /// where Position is an ObjectIdentifier of the Position component
         components[componentType, default: [:]][entity] = component // overwrites existing component
         entities.insert(entity)
