@@ -7,8 +7,8 @@ public protocol System {
 }
 
 public struct Entity: Hashable, CustomStringConvertible {
-    static var count = 0
-    let id: String
+    static public var count = 0
+    public let id: String
     public var description: String { id }
 
     public init(id: String) {
