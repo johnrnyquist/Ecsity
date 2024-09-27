@@ -160,8 +160,8 @@ open class ArchetypeStorage {
     }
 
     // MARK: - Component Management
-    func find<T: Component>(componentType: T.Type, in entity: Entity) -> T? {
-        guard let archetype = entityToArchetype[entity] 
+    public func find<T: Component>(componentType: T.Type, in entity: Entity) -> T? {
+        guard let archetype = entityToArchetype[entity]
         else {
             return nil
         }
