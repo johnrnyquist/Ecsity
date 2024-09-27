@@ -44,18 +44,18 @@ public struct Velocity: Component {
 
 import SpriteKit
 
-class Display: Component, Hashable, Equatable {
-    var node: SKNode
+open class Display: Component, Hashable, Equatable {
+    public var node: SKNode
 
-    init(node: SKNode) {
+    public init(node: SKNode) {
         self.node = node
     }
 
-    func hash(into hasher: inout Hasher) {
+    public func hash(into hasher: inout Hasher) {
         hasher.combine(ObjectIdentifier(self))
     }
 
-    static func ==(lhs: Display, rhs: Display) -> Bool {
+    public static func ==(lhs: Display, rhs: Display) -> Bool {
         ObjectIdentifier(lhs) == ObjectIdentifier(rhs)
     }
 }
