@@ -1,6 +1,6 @@
 import Foundation
 
-class Engine {
+open class Engine {
     let storage: ArchetypeStorage
     private(set) var systems: [System] = []
     var numEntities: Int { storage.numEntities }

@@ -1,6 +1,6 @@
 import Foundation
 
-class ArchetypeStorage {
+open class ArchetypeStorage {
     // Properties
     private var archetypes: [Archetype] = []
     private var entityToArchetype: [Entity: Archetype] = [:]

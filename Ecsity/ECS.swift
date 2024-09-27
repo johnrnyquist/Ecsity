@@ -1,15 +1,15 @@
 import Foundation
 
-protocol Component {}
+public protocol Component {}
 
-protocol System {
+public protocol System {
     func update(deltaTime: TimeInterval)
 }
 
-struct Entity: Hashable, CustomStringConvertible {
+public struct Entity: Hashable, CustomStringConvertible {
     static var count = 0
     let id: String
-    var description: String { id }
+    public var description: String { id }
 
     init(id: String) {
         Entity.count += 1

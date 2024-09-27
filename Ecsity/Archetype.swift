@@ -41,7 +41,7 @@ Entity: Entity_2
 Entity: Entity_3
  */
 
-final class Archetype {
+open class Archetype {
     static private(set) var count = 0
     let name: String
     /// The set of component types that this archetype contains ie [Position, Velocity]
@@ -126,14 +126,14 @@ final class Archetype {
 
 // MARK: - Equatable
 extension Archetype: Equatable {
-    static func == (lhs: Archetype, rhs: Archetype) -> Bool {
+    static public func == (lhs: Archetype, rhs: Archetype) -> Bool {
         lhs.name == rhs.name
     }
 }
 
 // MARK: - CustomStringConvertible
 extension Archetype: CustomStringConvertible {
-    var description: String {
+    public var description: String {
         var description = "\(name)\n"
         for (componentType, components) in components {
             description += "    \(componentType)\n"

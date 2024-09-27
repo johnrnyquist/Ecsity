@@ -1,13 +1,13 @@
 import Foundation
 
-class MovementSystem: System {
+open class MovementSystem: System {
     let storage: ArchetypeStorage
 
     init(storage: ArchetypeStorage) {
         self.storage = storage
     }
 
-    func update(deltaTime: TimeInterval) {
+    public func update(deltaTime: TimeInterval) {
         let entities = storage.findEntities(with: [Position.self, Velocity.self])
         for entity in entities {
             guard let position: Position = storage.find(componentType: Position.self, in: entity),
