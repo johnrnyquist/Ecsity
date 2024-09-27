@@ -74,7 +74,7 @@ open class ArchetypeStorage {
     }
 
     // MARK: - Entity Management
-    func findEntities(with componentTypes: [Component.Type]) -> Set<Entity> {
+    public func findEntities(with componentTypes: [Component.Type]) -> Set<Entity> {
         // Early exit if no component types are provided
         guard !componentTypes.isEmpty 
         else {
