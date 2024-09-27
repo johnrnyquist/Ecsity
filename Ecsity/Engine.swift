@@ -35,7 +35,7 @@ open class Engine {
 
     public func update(deltaTime: TimeInterval) {
         for system in systems {
-            system.update(deltaTime: deltaTime)
+            system.update(time: deltaTime)
         }
     }
 

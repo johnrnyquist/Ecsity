@@ -3,7 +3,7 @@ import Foundation
 public protocol Component {}
 
 public protocol System {
-    func update(deltaTime: TimeInterval)
+    func update(time: TimeInterval)
 }
 
 public struct Entity: Hashable, CustomStringConvertible {
