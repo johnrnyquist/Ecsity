@@ -226,7 +226,7 @@ extension ArchetypeStorage {
     public func getAllComponentsGroupedByEntities() -> [Entity: [Component]] {
         var entityToComponents: [Entity: [Component]] = [:]
         for archetype in archetypes {
-            for (componentType, entityComponents) in archetype.components {
+            for (_, entityComponents) in archetype.components {
                 for (entity, component) in entityComponents {
                     entityToComponents[entity, default: []].append(component)
                 }
