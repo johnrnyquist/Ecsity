@@ -1,15 +1,14 @@
 import Foundation
 
+typealias ComponentTypeSet = Set<ObjectIdentifier>
+
 open class ArchetypeStorage {
     // Properties
     private var archetypes: [Archetype] = []
     private var entityToArchetype: [Entity: Archetype] = [:]
-    private var componentTypesToArchetype: [Set<ObjectIdentifier>: Archetype] = [:]
-    private var memoizedResults: [Set<ObjectIdentifier>: Set<Entity>] = [:]
-    // Initializer
-    public init() {
-    }
-
+    private var componentTypesToArchetype: [ComponentTypeSet: Archetype] = [:]
+    private var memoizedResults: [ComponentTypeSet: Set<Entity>] = [:]
+    private(set) var entityToComponents: [Entity: [Component]] = [:]
     // Computed properties
     var allComponentTypesToArchetype: [Set<ObjectIdentifier>: Archetype] {
         componentTypesToArchetype
@@ -159,7 +158,7 @@ open class ArchetypeStorage {
         }
     }
 
-    // MARK: - Component Management
+// MARK: - Component Management
     public func find<T: Component>(componentType: T.Type, in entity: Entity) -> T? {
         guard let archetype = entityToArchetype[entity]
         else {
@@ -171,36 +170,34 @@ open class ArchetypeStorage {
     public func add<T: Component>(component: T, to entity: Entity) {
         clearCache(for: [ObjectIdentifier(T.self)])
         let objectIdentifier = ObjectIdentifier(T.self)
-        // Check if the entity already has an associated archetype
         guard let archetype = entityToArchetype[entity] else {
-            // Create a new archetype for the entity with the given component
             let newArchetype = add(entity: entity, withComponents: [objectIdentifier])
             newArchetype.updateComponent(component, for: entity)
             entityToArchetype[entity] = newArchetype
+            entityToComponents[entity, default: []].append(component)
             return
         }
-        // Check if the archetype already contains the component type
         guard archetype.contains(componentType: objectIdentifier) else {
-            // Create a new archetype to include the new component type
             guard let updatedArchetype = createNewArchetype(for: entity, addingComponentType: objectIdentifier) else { return }
             updatedArchetype.updateComponent(component, for: entity)
+            entityToComponents[entity, default: []].append(component)
             return
         }
-        // Update the component in the existing archetype
         archetype.updateComponent(component, for: entity)
+        entityToComponents[entity, default: []].append(component)
     }
 
     public func remove<T: Component>(componentType: T.Type, from entity: Entity) {
         clearCache(for: [ObjectIdentifier(T.self)])
-        guard let archetype = entityToArchetype[entity]
-        else {
+        guard let archetype = entityToArchetype[entity] else {
             return
         }
         archetype.remove(componentType: componentType, from: entity)
-        // If the entity has no more components, remove it from the archetype
+        entityToComponents[entity]?.removeAll { $0 is T }
         if archetype.getAllComponents(for: entity).isEmpty {
             archetype.remove(entity)
             entityToArchetype[entity] = nil
+            entityToComponents[entity] = nil
         }
     }
 
@@ -221,5 +218,20 @@ extension ArchetypeStorage {
 
     var numArchetypes: Int {
         archetypes.count
+    }
+}
+
+// In `ArchetypeStorage.swift`
+extension ArchetypeStorage {
+    public func getAllComponentsGroupedByEntities() -> [Entity: [Component]] {
+        var entityToComponents: [Entity: [Component]] = [:]
+        for archetype in archetypes {
+            for (componentType, entityComponents) in archetype.components {
+                for (entity, component) in entityComponents {
+                    entityToComponents[entity, default: []].append(component)
+                }
+            }
+        }
+        return entityToComponents
     }
 }
