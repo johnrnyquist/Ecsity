@@ -10,6 +10,16 @@ Ecsity is an entity-component-system (ECS) library for small Swift games. To wri
 
 Ecsity runs systems one at a time in the order you add them. For example, register movement before display so the renderer sees each ship's new position in the same frame.
 
+## Install with Swift Package Manager
+
+In Xcode, add `https://github.com/johnrnyquist/Ecsity.git` as a package dependency. Choose **Up to Next Major Version** starting at `1.0.0` and add the `Ecsity` library to your game target.
+
+In a Swift package manifest, add the following entry to the package's `dependencies` array, then add `.product(name: "Ecsity", package: "Ecsity")` to your target's dependencies.
+
+```swift
+.package(url: "https://github.com/johnrnyquist/Ecsity.git", from: "1.0.0")
+```
+
 ## One movement rule
 
 This system moves anything that has both a position and a velocity. Because `Position` is a struct, it writes the updated value back to the engine.
