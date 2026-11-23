@@ -50,38 +50,33 @@ open class ArchetypeStorage {
         }
         var result = Set<Entity>()
         for archetype in archetypes where archetype.componentTypes.isSuperset(of: queryTypes) {
-            // A registered type may still have unwritten values.
-            if queryTypes.allSatisfy({ archetype.components[$0]?.count == archetype.entities.count }) {
-                result.formUnion(archetype.entities)
-            } else {
-                for entity in archetype.entities where queryTypes.allSatisfy({ archetype.components[$0]?[entity] != nil }) {
-                    result.insert(entity)
-                }
-            }
+            result.formUnion(archetype.entities)
         }
         // Memoize the result
         memoizedResults[queryTypes] = result
         return result
     }
 
+    public func add(entity: Entity) {
+        guard entityToArchetype[entity] == nil else { return }
+        move(entity, from: nil, to: [])
+    }
+
     @discardableResult
-    public func add(entity: Entity, withComponents componentTypes: Set<ObjectIdentifier>) -> Archetype {
-        let source = entityToArchetype[entity]
-        if let source, source.componentTypes == componentTypes {
-            return source
-        }
+    private func move(_ entity: Entity, from source: Archetype?, to componentTypes: ComponentTypeSet) -> Archetype {
         let destination = componentTypesToArchetype[componentTypes] ?? addArchetype(for: componentTypes)
         if let source {
             for type in source.componentTypes where componentTypes.contains(type) {
-                if let component = source.components[type]?[entity] {
-                    destination.components[type, default: [:]][entity] = component
-                }
+                destination.components[type, default: [:]][entity] = source.components[type]?[entity]
             }
-            clearCache(for: source.componentTypes.subtracting(componentTypes))
-            detach(entity, from: source)
         }
         destination.add(entity)
         entityToArchetype[entity] = destination
+        clearCache(for: componentTypes.symmetricDifference(source?.componentTypes ?? []))
+        // Dropping the old values can run a component's deinit and query the engine.
+        if let source {
+            detach(entity, from: source)
+        }
         return destination
     }
 
@@ -100,7 +95,7 @@ open class ArchetypeStorage {
         }
     }
 
-// MARK: - Component Management
+    // MARK: - Component Management
     public func find<T: Component>(componentType: T.Type, in entity: Entity) -> T? {
         guard let archetype = entityToArchetype[entity]
         else {
@@ -117,24 +112,21 @@ open class ArchetypeStorage {
             destination = current
         } else {
             let signature = (current?.componentTypes ?? []).union([type])
-            destination = add(entity: entity, withComponents: signature)
-        }
-        if destination.components[type]?[entity] == nil {
-            clearCache(for: [type])
+            destination = move(entity, from: current, to: signature)
         }
         destination.add(component: component, to: entity)
     }
 
     public func remove<T: Component>(componentType: T.Type, from entity: Entity) {
         let type = ObjectIdentifier(componentType)
-        guard let archetype = entityToArchetype[entity], archetype.components[type]?[entity] != nil else {
+        guard let archetype = entityToArchetype[entity], archetype.contains(componentType: type) else {
             return
         }
         let remaining = archetype.componentTypes.subtracting([type])
-        if remaining.contains(where: { archetype.components[$0]?[entity] != nil }) {
-            add(entity: entity, withComponents: remaining)
-        } else {
+        if remaining.isEmpty {
             remove(entity: entity)
+        } else {
+            move(entity, from: archetype, to: remaining)
         }
     }
 

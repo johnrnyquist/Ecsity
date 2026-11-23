@@ -18,13 +18,13 @@ final class BulkComponentTests: XCTestCase {
         let first = Entity(id: "first")
         let second = Entity(id: "second")
         let third = Entity(id: "third")
-        let emptySlot = Entity(id: "emptySlot")
+        let empty = Entity(id: "empty")
 
         engine.add(component: Score(value: 8), to: first)
         engine.add(component: Score(value: 8), to: second)
         engine.add(component: Score(value: 8), to: third)
         engine.add(component: Label(text: "third"), to: third)
-        _ = engine.add(entity: emptySlot, withComponents: [ObjectIdentifier(Score.self)])
+        engine.add(entity: empty)
 
         let result = engine.findAllComponents(ofType: Score.self)
 

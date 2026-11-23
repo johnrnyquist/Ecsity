@@ -28,31 +28,58 @@ final class EntityMembershipTests: XCTestCase {
         XCTAssertNil(deleted)
     }
 
-    func testReservedTypesMatchOnlyAfterValuesAreWritten() {
-        let signature = Set([ObjectIdentifier(Position.self), ObjectIdentifier(Velocity.self)])
-        let archetype = engine.add(entity: entity, withComponents: signature)
-        _ = engine.add(entity: neighbor, withComponents: signature)
-        XCTAssertEqual(engine.findEntities(with: []), [entity, neighbor])
+    func testAddingAnEmptyEntityIsIdempotent() {
+        let addEntity: (Entity) -> Void = engine.add(entity:)
+        addEntity(entity)
+        engine.add(entity: entity)
+
+        XCTAssertEqual(engine.numEntities, 1)
+        XCTAssertEqual(engine.findEntities(with: []), [entity])
         XCTAssertEqual(engine.findEntities(with: [Position.self]), [])
+        XCTAssertNil(engine.find(componentType: Position.self, in: entity))
+
+        engine.remove(entity: entity)
+        XCTAssertEqual(engine.numEntities, 0)
+        XCTAssertEqual(engine.findEntities(with: []), [])
+    }
+
+    func testFirstComponentRegistersAnEntity() {
+        XCTAssertEqual(engine.findEntities(with: []), [])
+        XCTAssertEqual(engine.findEntities(with: [Position.self]), [])
+        XCTAssertEqual(engine.findEntities(with: [Position.self, Velocity.self]), [])
+
         engine.add(component: position, to: entity)
+        XCTAssertEqual(engine.numEntities, 1)
+        XCTAssertEqual(engine.findEntities(with: []), [entity])
         XCTAssertEqual(engine.findEntities(with: [Position.self]), [entity])
         XCTAssertEqual(engine.findEntities(with: [Position.self, Velocity.self]), [])
+
         engine.add(component: velocity, to: entity)
-        XCTAssertTrue(engine.add(entity: entity, withComponents: signature) === archetype)
         XCTAssertTrue(engine.find(componentType: Position.self, in: entity) === position)
         XCTAssertEqual(engine.findEntities(with: [Position.self, Velocity.self]), [entity])
     }
 
-    func testRemovingAnUnwrittenValuePreservesRegistration() {
-        _ = engine.add(entity: entity, withComponents: [ObjectIdentifier(Position.self)])
-        _ = engine.add(entity: neighbor, withComponents: [])
+    func testRemovingTheLastComponentUnregistersAnExplicitlyAddedEntity() {
+        engine.add(entity: entity)
+        engine.add(entity: neighbor)
+
         engine.remove(componentType: Position.self, from: entity)
-        engine.remove(componentType: Position.self, from: neighbor)
         XCTAssertEqual(engine.findEntities(with: []), [entity, neighbor])
         XCTAssertEqual(engine.numEntities, 2)
+        XCTAssertEqual(engine.findEntities(with: [Position.self]), [])
+
         engine.add(component: position, to: entity)
+        XCTAssertEqual(engine.findEntities(with: [Position.self]), [entity])
+
         engine.remove(componentType: Position.self, from: entity)
         XCTAssertEqual(engine.findEntities(with: []), [neighbor])
+        XCTAssertEqual(engine.numEntities, 1)
+        XCTAssertEqual(engine.findEntities(with: [Position.self]), [])
+        XCTAssertNil(engine.find(componentType: Position.self, in: entity))
+
+        engine.add(component: position, to: entity)
+        XCTAssertEqual(engine.findEntities(with: []), [entity, neighbor])
+        XCTAssertEqual(engine.findEntities(with: [Position.self]), [entity])
     }
 
     func testRemovingAndReaddingAComponentUpdatesCachedMembership() {
@@ -71,23 +98,54 @@ final class EntityMembershipTests: XCTestCase {
         XCTAssertEqual(engine.findEntities(with: [Position.self, Velocity.self]), [entity, neighbor])
     }
 
-    func testReregistrationKeepsOnlyOverlappingValuesAndLeavesOtherMembersUntouched() {
-        for member in [entity, neighbor] {
-            engine.add(component: position, to: member)
-            engine.add(component: velocity, to: member)
+    func testQueriesFromAReleasedComponentSeeTheCompletedMove() {
+        final class OnRemoval: Component {
+            let callback: () -> Void
+            init(_ callback: @escaping () -> Void) { self.callback = callback }
+            deinit { callback() }
         }
-        XCTAssertEqual(engine.findEntities(with: [Velocity.self]), [entity, neighbor])
-        let signature = Set([ObjectIdentifier(Position.self), ObjectIdentifier(TestComponent.self)])
-        _ = engine.add(entity: entity, withComponents: signature)
-        XCTAssertTrue(engine.find(componentType: Position.self, in: entity) === position)
-        XCTAssertNil(engine.find(componentType: Velocity.self, in: entity))
-        XCTAssertEqual(engine.find(componentType: Velocity.self, in: neighbor)?.dx, 3)
-        XCTAssertEqual(engine.findEntities(with: [Velocity.self]), [neighbor])
-        XCTAssertEqual(engine.findEntities(with: [TestComponent.self]), [])
-        _ = engine.add(entity: entity, withComponents: [])
-        XCTAssertEqual(engine.findEntities(with: [Position.self]), [neighbor])
+
+        let entity = self.entity
+        let engine = self.engine
+        var released = false
+        engine.add(component: position, to: entity)
+        engine.add(component: OnRemoval { [weak engine] in
+            released = true
+            XCTAssertEqual(engine?.findEntities(with: [Position.self]), [entity])
+            XCTAssertEqual(engine?.findEntities(with: [OnRemoval.self]), [])
+        }, to: entity)
+        XCTAssertEqual(engine.findEntities(with: [OnRemoval.self]), [entity])
+
+        engine.remove(componentType: OnRemoval.self, from: entity)
+
+        XCTAssertTrue(released)
+        XCTAssertEqual(engine.findEntities(with: [Position.self]), [entity])
+    }
+
+    func testAddingAPopulatedEntityPreservesItsComponents() {
+        let neighborPosition = Position(x: 5, y: 6)
+        let neighborVelocity = Velocity(dx: 7, dy: 8)
+        engine.add(component: position, to: entity)
+        engine.add(component: velocity, to: entity)
+        engine.add(component: neighborPosition, to: neighbor)
+        engine.add(component: neighborVelocity, to: neighbor)
+        XCTAssertEqual(engine.findEntities(with: [Position.self, Velocity.self]), [entity, neighbor])
+
+        engine.add(entity: entity)
+
+        XCTAssertEqual(engine.numEntities, 2)
         XCTAssertEqual(engine.findEntities(with: []), [entity, neighbor])
+        XCTAssertEqual(engine.findEntities(with: [Position.self, Velocity.self]), [entity, neighbor])
+        XCTAssertTrue(engine.find(componentType: Position.self, in: entity) === position)
+        let storedVelocity = engine.find(componentType: Velocity.self, in: entity)
+        XCTAssertEqual(storedVelocity?.dx, velocity.dx)
+        XCTAssertEqual(storedVelocity?.dy, velocity.dy)
+        XCTAssertTrue(engine.find(componentType: Position.self, in: neighbor) === neighborPosition)
+        let storedNeighborVelocity = engine.find(componentType: Velocity.self, in: neighbor)
+        XCTAssertEqual(storedNeighborVelocity?.dx, neighborVelocity.dx)
+        XCTAssertEqual(storedNeighborVelocity?.dy, neighborVelocity.dy)
+
         engine.remove(entity: entity)
-        XCTAssertEqual(engine.findEntities(with: [Position.self]), [neighbor])
+        XCTAssertEqual(engine.findEntities(with: [Position.self, Velocity.self]), [neighbor])
     }
 }

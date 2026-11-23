@@ -24,14 +24,12 @@ open class Engine {
         storage.find(componentType: componentType, in: entity)
     }
 
-    /// Registers an entity with the given component types. Registering it again keeps
-    /// stored values for types present in both registrations and drops the others.
-    /// A type starts matching queries once its value has been added.
-    @discardableResult
-    public func add(entity: Entity, withComponents componentTypes: Set<ObjectIdentifier>) -> Archetype {
-        storage.add(entity: entity, withComponents: componentTypes)
+    /// Registers an empty entity. Calling this again preserves its components.
+    public func add(entity: Entity) {
+        storage.add(entity: entity)
     }
 
+    /// Attaches or replaces a component, registering the entity on its first attachment.
     public func add<T: Component>(component: T, to entity: Entity) {
         storage.add(component: component, to: entity)
     }
@@ -50,6 +48,7 @@ open class Engine {
         storage.remove(entity: entity)
     }
 
+    /// Removing an entity's last component also removes the entity from this engine.
     public func remove<T: Component>(componentType: T.Type, from entity: Entity) {
         storage.remove(componentType: componentType, from: entity)
     }
