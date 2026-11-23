@@ -124,9 +124,13 @@ class ArchetypeStorageTests: XCTestCase {
     func testRemoveComponentTypeFromArchetype() {
         storage.add(component: Position(x: 1.0, y: 1.0), to: entity1)
         storage.add(component: Velocity(dx: 1.0, dy: 1.0), to: entity1)
-        storage.remove(entity: entity1)
-        XCTAssertNil(storage.find(componentType: Position.self, in: entity1))
+        storage.remove(componentType: Velocity.self, from: entity1)
+        XCTAssertEqual(storage.archetype(for: entity1)?.componentTypes, [ObjectIdentifier(Position.self)])
+        XCTAssertNotNil(storage.find(componentType: Position.self, in: entity1))
         XCTAssertNil(storage.find(componentType: Velocity.self, in: entity1))
+        storage.remove(componentType: Position.self, from: entity1)
+        XCTAssertTrue(storage.allArchetypes.isEmpty)
+        XCTAssertTrue(storage.allComponentTypesToArchetype.isEmpty)
     }
 
     func testGlobalArchetypeCleanup() {

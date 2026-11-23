@@ -71,11 +71,7 @@ open class Archetype {
     }
 
     func add(_ entity: Entity) {
-        guard !entities.contains(entity) else { return }
         entities.insert(entity)
-        for componentType in componentTypes {
-            components[componentType, default: [:]][entity] = nil
-        }
     }
 
     func contains(componentType: ObjectIdentifier) -> Bool {
@@ -84,14 +80,14 @@ open class Archetype {
 
     func remove(_ entity: Entity) {
         entities.remove(entity)
-        components.forEach { componentType, _ in
+        for componentType in Array(components.keys) {
             components[componentType]?[entity] = nil
         }
     }
 
     func remove<T: Component>(componentType: T.Type, from entity: Entity) {
         let componentTypeID = ObjectIdentifier(componentType)
-        components[componentTypeID]?[entity] = nil
+        guard components[componentTypeID]?.removeValue(forKey: entity) != nil else { return }
         if components[componentTypeID]?.isEmpty ?? true {
             components[componentTypeID] = nil
         }
@@ -103,14 +99,6 @@ open class Archetype {
     func find<T: Component>(componentType: T.Type, in entity: Entity) -> T? {
         let componentTypeID = ObjectIdentifier(componentType)
         return components[componentTypeID]?[entity] as? T
-    }
-
-    func updateComponent<T: Component>(_ component: T, for entity: Entity) {
-        let componentType = ObjectIdentifier(T.self)
-        if components[componentType] == nil {
-            components[componentType] = [:]
-        }
-        components[componentType]?[entity] = component
     }
 
     func getAllComponents(for entity: Entity) -> [Component] {

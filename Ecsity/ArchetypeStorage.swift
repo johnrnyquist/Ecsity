@@ -8,7 +8,6 @@ open class ArchetypeStorage {
     private var entityToArchetype: [Entity: Archetype] = [:]
     private var componentTypesToArchetype: [ComponentTypeSet: Archetype] = [:]
     private var memoizedResults: [ComponentTypeSet: Set<Entity>] = [:]
-    private(set) var entityToComponents: [Entity: [Component]] = [:]
     // Computed properties
     var allComponentTypesToArchetype: [Set<ObjectIdentifier>: Archetype] {
         componentTypesToArchetype
@@ -17,79 +16,49 @@ open class ArchetypeStorage {
         archetypes
     }
     var numEntities: Int {
-        entities.count
-    }
-    private var entities: Set<Entity> {
-        Set(entityToArchetype.keys)
+        entityToArchetype.count
     }
     // MARK: - Archetype Management
-    func createNewArchetype(for entity: Entity, addingComponentType objectIdentifier: ObjectIdentifier) -> Archetype? {
-        clearCache(for: [objectIdentifier])
-        guard let oldArchetype = entityToArchetype[entity]
-        else {
-            return nil
-        }
-        let newComponentTypes = oldArchetype.componentTypes.union([objectIdentifier])
-        if newComponentTypes == oldArchetype.componentTypes {
-            return oldArchetype
-        }
-        if let existingArchetype = componentTypesToArchetype[newComponentTypes] {
-            migrateEntity(entity, from: oldArchetype, to: existingArchetype)
-            return existingArchetype
-        } else {
-            let newArchetype = addArchetype(for: newComponentTypes)
-            migrateEntity(entity, from: oldArchetype, to: newArchetype)
-            return newArchetype
-        }
-    }
-
     func archetype(for entity: Entity) -> Archetype? {
         entityToArchetype[entity]
     }
 
-    @discardableResult
-    func addArchetype(for componentTypes: Set<ObjectIdentifier>) -> Archetype {
+    private func addArchetype(for componentTypes: Set<ObjectIdentifier>) -> Archetype {
         let newArchetype = Archetype(componentTypes: componentTypes)
         archetypes.append(newArchetype)
         componentTypesToArchetype[componentTypes] = newArchetype
         return newArchetype
     }
 
-    func updateArchetypeWithComponent<T: Component>(_ archetype: Archetype, _ component: T, _ entity: Entity) {
-        clearCache(for: [ObjectIdentifier(T.self)])
-        archetype.add(component: component, to: entity)
-    }
-
-    func removeEmptyArchetypes() {
-        // Identify and remove archetypes without entities
-        for archetype in archetypes {
-            if archetype.entities.isEmpty {
-                archetypes.removeAll { $0 === archetype }
-                componentTypesToArchetype.removeValue(forKey: archetype.componentTypes)
-            }
+    private func detach(_ entity: Entity, from archetype: Archetype) {
+        archetype.remove(entity)
+        if archetype.entities.isEmpty {
+            archetypes.removeAll { $0 === archetype }
+            componentTypesToArchetype.removeValue(forKey: archetype.componentTypes)
         }
     }
 
     // MARK: - Entity Management
     public func findEntities(with componentTypes: [Component.Type]) -> Set<Entity> {
-        // Early exit if no component types are provided
-        guard !componentTypes.isEmpty
-        else {
-            return entities
+        guard !componentTypes.isEmpty else {
+            return Set(entityToArchetype.keys)
         }
         let queryTypes = Set(componentTypes.map { componentType in ObjectIdentifier(componentType) })
         // Check if the result is already memoized
         if let cachedResult = memoizedResults[queryTypes] {
             return cachedResult
         }
-        // Compute the result if not memoized
-        let result = Set(archetypes.lazy
-                                   .filter { archetype in
-                                       archetype.componentTypes.isSuperset(of: queryTypes)
-                                   }
-                                   .flatMap { archetype in
-                                       archetype.entities
-                                   })
+        var result = Set<Entity>()
+        for archetype in archetypes where archetype.componentTypes.isSuperset(of: queryTypes) {
+            // A registered type may still have unwritten values.
+            if queryTypes.allSatisfy({ archetype.components[$0]?.count == archetype.entities.count }) {
+                result.formUnion(archetype.entities)
+            } else {
+                for entity in archetype.entities where queryTypes.allSatisfy({ archetype.components[$0]?[entity] != nil }) {
+                    result.insert(entity)
+                }
+            }
+        }
         // Memoize the result
         memoizedResults[queryTypes] = result
         return result
@@ -97,64 +66,37 @@ open class ArchetypeStorage {
 
     @discardableResult
     public func add(entity: Entity, withComponents componentTypes: Set<ObjectIdentifier>) -> Archetype {
-        clearCache(for: componentTypes)
-        if let archetype = componentTypesToArchetype[componentTypes] {
-            archetype.add(entity)
-            entityToArchetype[entity] = archetype
-            return archetype
-        } else {
-            let newArchetype = addArchetype(for: componentTypes)
-            newArchetype.add(entity)
-            entityToArchetype[entity] = newArchetype
-            return newArchetype
+        let source = entityToArchetype[entity]
+        if let source, source.componentTypes == componentTypes {
+            return source
         }
-    }
-
-    func migrateEntity(_ entity: Entity, from oldArchetype: Archetype, to newArchetype: Archetype) {
-        clearCache(for: oldArchetype.componentTypes.union(newArchetype.componentTypes))
-        newArchetype.add(entity)
-        entityToArchetype[entity] = newArchetype
-        // Copy existing components to the new archetype
-        for componentType in oldArchetype.componentTypes {
-            if let component = oldArchetype.components[componentType]?[entity] {
-                newArchetype.components[componentType, default: [:]][entity] = component
+        let destination = componentTypesToArchetype[componentTypes] ?? addArchetype(for: componentTypes)
+        if let source {
+            for type in source.componentTypes where componentTypes.contains(type) {
+                if let component = source.components[type]?[entity] {
+                    destination.components[type, default: [:]][entity] = component
+                }
             }
+            clearCache(for: source.componentTypes.subtracting(componentTypes))
+            detach(entity, from: source)
         }
-        // Remove entity from old archetype
-        oldArchetype.remove(entity)
-        if oldArchetype.entities.isEmpty {
-            archetypes.removeAll { $0 === oldArchetype }
-            componentTypesToArchetype.removeValue(forKey: oldArchetype.componentTypes)
-        }
+        destination.add(entity)
+        entityToArchetype[entity] = destination
+        return destination
     }
 
     public func remove(entity: Entity) {
-        guard let archetype = entityToArchetype[entity]
-        else {
+        guard let archetype = entityToArchetype.removeValue(forKey: entity) else {
             return
         }
         clearCache(for: archetype.componentTypes)
-        // Remove entity from archetype and disassociate components
-        archetype.remove(entity)
-        entityToArchetype[entity] = nil
-        for objectIdentifier in archetype.componentTypes {
-            if var componentGroup = archetype.components[objectIdentifier] {
-                componentGroup[entity] = nil
-                // Remove the component type itself if empty
-                if componentGroup.isEmpty {
-                    archetype.components.removeValue(forKey: objectIdentifier)
-                }
-            }
-        }
-        // Remove empty archetype
-        removeEmptyArchetypes()
+        detach(entity, from: archetype)
     }
 
-    func clearCache(for componentTypes: Set<ObjectIdentifier>) {
-        for key in memoizedResults.keys {
-            if !key.isDisjoint(with: componentTypes) {
-                memoizedResults.removeValue(forKey: key)
-            }
+    private func clearCache(for componentTypes: Set<ObjectIdentifier>) {
+        guard !componentTypes.isEmpty else { return }
+        for key in memoizedResults.keys.filter({ !$0.isDisjoint(with: componentTypes) }) {
+            memoizedResults.removeValue(forKey: key)
         }
     }
 
@@ -168,44 +110,39 @@ open class ArchetypeStorage {
     }
 
     public func add<T: Component>(component: T, to entity: Entity) {
-        clearCache(for: [ObjectIdentifier(T.self)])
-        let objectIdentifier = ObjectIdentifier(T.self)
-        guard let archetype = entityToArchetype[entity] else {
-            let newArchetype = add(entity: entity, withComponents: [objectIdentifier])
-            newArchetype.updateComponent(component, for: entity)
-            entityToArchetype[entity] = newArchetype
-            entityToComponents[entity, default: []].append(component)
-            return
+        let type = ObjectIdentifier(T.self)
+        let current = entityToArchetype[entity]
+        let destination: Archetype
+        if let current, current.contains(componentType: type) {
+            destination = current
+        } else {
+            let signature = (current?.componentTypes ?? []).union([type])
+            destination = add(entity: entity, withComponents: signature)
         }
-        guard archetype.contains(componentType: objectIdentifier) else {
-            guard let updatedArchetype = createNewArchetype(for: entity, addingComponentType: objectIdentifier) else { return }
-            updatedArchetype.updateComponent(component, for: entity)
-            entityToComponents[entity, default: []].append(component)
-            return
+        if destination.components[type]?[entity] == nil {
+            clearCache(for: [type])
         }
-        archetype.updateComponent(component, for: entity)
-        entityToComponents[entity, default: []].append(component)
+        destination.add(component: component, to: entity)
     }
 
     public func remove<T: Component>(componentType: T.Type, from entity: Entity) {
-        clearCache(for: [ObjectIdentifier(T.self)])
-        guard let archetype = entityToArchetype[entity] else {
+        let type = ObjectIdentifier(componentType)
+        guard let archetype = entityToArchetype[entity], archetype.components[type]?[entity] != nil else {
             return
         }
-        archetype.remove(componentType: componentType, from: entity)
-        entityToComponents[entity]?.removeAll { $0 is T }
-        if archetype.getAllComponents(for: entity).isEmpty {
-            archetype.remove(entity)
-            entityToArchetype[entity] = nil
-            entityToComponents[entity] = nil
+        let remaining = archetype.componentTypes.subtracting([type])
+        if remaining.contains(where: { archetype.components[$0]?[entity] != nil }) {
+            add(entity: entity, withComponents: remaining)
+        } else {
+            remove(entity: entity)
         }
     }
 
-    public func findAllComponents<T: Component>(ofType componentType: T.Type) -> Set<T> {
-        let objectIdentifier = ObjectIdentifier(T.self)
-        return Set(archetypes.flatMap { archetype in
-            archetype.components[objectIdentifier]?.compactMap { $0.value as? T } ?? []
-        })
+    public func findAllComponents<T: Component>(ofType componentType: T.Type) -> [T] {
+        let componentTypeID = ObjectIdentifier(componentType)
+        return archetypes.flatMap { archetype in
+            archetype.components[componentTypeID]?.values.compactMap { $0 as? T } ?? []
+        }
     }
 }
 
